@@ -1,0 +1,98 @@
+﻿@page "/"
+@inject NavigationManager NavManager
+@implements IAsyncDisposable
+
+@inject DemoProduct DemoP
+
+<div class="form-group">
+    <label>
+        User :<input @bind-value="userinput">
+    </label>
+</div>
+
+<div class="form-group">
+    <label>
+        Message :<input @bind-value="messageInput">
+    </label>
+</div>
+
+<button @onclick="Send" disabled="@(IsConnected == false)">Send</button>
+
+<br />
+
+<ul>
+    @foreach (string message in messages)
+    {
+        <li>@message</li>
+    }
+</ul>
+
+<div>
+    <p>Value 1 :@DemoP.Value1</p>
+    <p>Value 2 :@DemoP.Value2</p>
+</div>
+
+@code
+{
+    private HubConnection? hubconnection;
+    private List<string> messages = new List<string>();
+    private string? userinput;
+    private string? messageInput;
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubconnection = new HubConnectionBuilder()
+            .WithUrl(NavManager.ToAbsoluteUri("/chatHub"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubconnection.On<string, string>("ReceiveMessage", (user, message) => {
+            var formattedMessage = $"{user}:{message}";
+            messages.Add(formattedMessage);
+            InvokeAsync(StateHasChanged);
+        });
+
+        await hubconnection.StartAsync();
+    }
+
+    private async Task Send()
+    {
+        if (hubconnection is not null)
+        {
+            await hubconnection.SendAsync("SendMessage", userinput, messageInput);
+        }
+    }
+
+    public bool IsConnected => hubconnection?.State == HubConnectionState.Connected;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubconnection is not null)
+        {
+            await hubconnection.DisposeAsync();
+        }
+    }
+
+}
+
+
+
+
+@*<div class="row" style="padding-top:50px;">
+
+    <div class="col-md-4">
+        <div class="control-group">
+            <div>
+                <label for="broadcast">Message</label>
+                <input type="text" id="broadcast" name="broadcast" />
+            </div>
+            <button id="btn-broadcast">Broadcast</button>
+        </div>
+    </div>
+
+    <div class="col-md-7">
+        <p>SignalR Messages:</p>
+        <pre id="signalr-message-panel"></pre>
+    </div>
+
+</div>*@
